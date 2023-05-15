@@ -16,7 +16,7 @@ app.use(cors());
 
 app.use('/posts', postRoutes)
 app.use('/user', userRoutes)
-app.get('/', (req,res)=>{
+app.get('/', (req, res)=>{
     res.send('Welcome to memories API')
 })
 

@@ -1,30 +1,62 @@
-import mongoose from 'mongoose'
-import PostMessage from '../models/postMessage.js'
+import mongoose from 'mongoose';
+import PostMessage from '../models/postMessage.js';
 
-//get all posts
-export const getPosts = async (req, res) => {
+// get post
+export const getPost = async (req, res) => {
+  const { id } = req.params;
   try{
-    const postMessages = await PostMessage.find()
-    res.status(200).json(postMessages)
+    // if(!mongoose.Types.ObjectId.isValid(_id)) return res.status(404).send("No post with that id");
+     const post = await PostMessage.findById(id);
+     res.status(200).json(post);
   } 
   catch(error){
     res.status(404).json({ message: error.message })
   }
 }
+//get all posts
+export const getPosts = async (req, res) => {
+  const { page } = req.query
+  try{
+    //the maximum number of posts/documents to retrieve
+    const displayLimit = 5
+    // number of documents to skip before retrieving the remaining posts.
+    const startIndex = (Number(page) -1) * displayLimit
+    const totalPosts = await PostMessage.countDocuments({});
+    // sort base on the latest post and limit the number of results given
+    const posts = await PostMessage.find().sort({ _id: -1 }).limit(displayLimit).skip(startIndex)
 
+    res.status(200).json({ data: posts, currentPage: Number(page), totalPages: Math.ceil(totalPosts/displayLimit) })
+  } 
+  catch(error){
+    res.status(404).json({ message: error.message })
+  }
+}
+// search and get posts // 'i' stands for ignore case
+export const getPostsBySearch = async (req, res) => {
+  const { searchQuery, tags } = req.query;
+  try {
+    // convert the query into reqExp to make it easier when searching through the DB
+    const title = new RegExp(searchQuery, 'i'); 
+    // find documents that match at least one of the conditions provided
+    const posts = await PostMessage.find({ $or: [{ title }, { tags: { $in: tags.split(',') } }] });
+    res.json({ data: posts });
+  } catch (error) {
+    res.status(404).json({ message: error.message });
+    console.log(error);
+  }
+}
 //add a post
 export const createPost = async (req, res) => {
   const post = req.body
-  const newPost = new PostMessage({ ...post, creator: req.userId, createdAt: new Date().toISOString() });
   try{
+    const newPost = new PostMessage({ ...post, creator: req.userId, createdAt: new Date().toISOString() });
     await newPost.save()
-    res.status(201).json(newPost)
+    res.status(200).json(newPost)
   }
   catch(error){
-    res.status(500).json({ message: error.message });
+    res.status(409).json({ message: error.message });
   }
 }
-
 // update a post
 export const updatePost = async (req, res) => {
   try {
@@ -42,7 +74,6 @@ export const updatePost = async (req, res) => {
     res.status(500).json({message: error.message})
   }
 }
-
 // delete a post
 export const deletePost = async (req, res) => {
   try {
@@ -54,14 +85,13 @@ export const deletePost = async (req, res) => {
     console.log(error)
   }
 }
-
 // handle post likes
 export const likePost = async (req, res) => {
   try {
     const { id: _id } = req.params;
     if(!req.userId) return res.json({ message: "unauthenticated"})
     // check if the post exist
-    if(!mongoose.Types.ObjectId.isValid(_id)) return res.status(404).send("in valid request")
+    if(!mongoose.Types.ObjectId.isValid(_id)) return res.status(404).send("invalid request")
     // get the post since it exist
     const post = await PostMessage.findById(_id);
 
@@ -77,6 +107,6 @@ export const likePost = async (req, res) => {
     const updatedLikes = await PostMessage.findByIdAndUpdate(_id, post, {new: true});
     res.json(updatedLikes)
   } catch (error) {
-    console.log(error);
+    res.status(500).json({message: error.message});
   }
 }
